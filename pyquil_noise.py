@@ -61,7 +61,7 @@ class KrausModel(_KrausModel):
         m = np.asarray(m, dtype=complex)
         if m.ndim == 3:
             m = m[0] + 1j * m[1]
-        if not m.ndim == 2:  # pragma no coverage
+        if not (m.ndim == 2):  # pragma no coverage
             raise ValueError("Need 2d array.")
         if not m.shape[0] == m.shape[1]:  # pragma no coverage
             raise ValueError("Need square matrix.")
