@@ -16,9 +16,16 @@ class Calibration:
             response = requests.get(url + str(QPU))
             file = json.loads(response.text)
             self.calibrations = file["lattice"]["specs"]
+            self.T1, self.T2 = self.create_1q_dicts()
         
-    
-    def T1(self, Q: int=0) -> float:
+    def create_1q_dicts(self):
+        qs = self.calibrations['1Q'].keys()
+        t1 = [self.calibrations['1Q'][q]['T1'] for q in qs]
+        t2 = [self.calibrations['1Q'][q]['T2'] for q in qs]
+        intqs = [int(q) for q in qs]
+        return dict(zip(intqs,t1)), dict(zip(intqs,t2))
+
+    def t1(self, Q: int=0) -> float:
         """
         Get the T1 value for a given qubit.
 
@@ -35,7 +42,7 @@ class Calibration:
             raise ValueError("Qubit not found")
         return self.calibrations["1Q"][str(Q)]["T1"]
 
-    def T2(self, Q: int) -> float:
+    def t2(self, Q: int) -> float:
         """
         Get the T2 value for a given qubit.
 
