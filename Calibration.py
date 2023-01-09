@@ -10,7 +10,7 @@ class Calibration:
 
     def __init__(self, QPU: int=2) -> None:
         if QPU not in [2,3]:
-            raise ValueError("QPU must be 2 or 3")
+            raise ValueError("QPU must be 2 or 3 as in Aspen-M-2 or Aspen-M-3")
         else:
             url = "https://forest-server.qcs.rigetti.com/lattices/Aspen-M-"
             response = requests.get(url + str(QPU))
