@@ -37,3 +37,23 @@ def get_t_value(QPU: int=2, qubit: int=0, T: int=1) -> float:
         raise ValueError("Qubit not found")
 
     return qs[str(qubit)]["T" + str(T)]
+
+def get_T_values(qc_name="Aspen-M-2"):
+    """
+    Get the T1 or T2 value for a given qubit on a given QPU.
+
+    Args:
+        qc_name: name of the qc
+        
+    Returns:
+        float: T1/2 time in microseconds
+    """
+    url = "https://forest-server.qcs.rigetti.com/lattices/"
+    response = requests.get(url + qc_name)
+    file = json.loads(response.text)
+    calibrations = file["lattice"]["specs"]
+    qs = calibrations['1Q'].keys()
+    t1 = [calibrations['1Q'][q]['T1'] for q in qs]
+    t2 = [calibrations['1Q'][q]['T2'] for q in qs]
+    intqs = [int(q) for q in qs]
+    return dict(zip(intqs,t1)), dict(zip(intqs,t2))

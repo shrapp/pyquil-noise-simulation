@@ -342,8 +342,10 @@ def damping_after_dephasing(T1: float, T2: float, gate_time: float) -> List[np.n
     if T2 != INFINITY:
         gamma_phi = float(gate_time) / float(T2)
         if T1 != INFINITY:
-            # if T2 > 2 * T1:
-            #     raise ValueError("T2 is upper bounded by 2 * T1")
+            if T2 > 2 * T1:
+                T2 = 2 * T1
+                gamma_phi = float(gate_time) / float(T2)
+                # raise ValueError("T2 is upper bounded by 2 * T1")
             gamma_phi -= float(gate_time) / float(2 * T1)
 
         dephasing = dephasing_kraus_map(p=0.5 * (1 - np.exp(-gamma_phi)))
