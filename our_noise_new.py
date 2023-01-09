@@ -18,7 +18,7 @@ from our_noise import _get_program_gates, _decoherence_noise_model, _noise_model
 
 def apply_noise_model_I(prog: "Program", noise_model: NoiseModel) -> "Program":
     """
-    Apply a noise model to a program and generated a 'noisy-fied' version of the program.
+    Apply a noise model to a program and generate a 'noisy-fied' version of the program.
     this function adds noise only to I gates.
 
     :param prog: A Quil Program object.
@@ -48,7 +48,7 @@ def add_decoherence_noise_to_I(
     T2: Union[Dict[int, float], float] = 30e-6,
     double_gate_time: bool = False, # maybe not needed
     gate_time_1q: float = 40e-9,
-    gate_time_2q: float = 150e-09,
+    gate_time_2q: float = 180e-09,
     ro_fidelity: Union[Dict[int, float], float] = 0.95,
 ) -> "Program":
     """
@@ -86,6 +86,7 @@ def add_noise_to_program(qc, p, cal, recompile: bool=True):
     :return: A new program with noisy operators.
     """
     new_p = Program()
+    # TODO: check if change to "to naitive"
     if recompile:
         p = qc.compile(p)
     for i in p:
