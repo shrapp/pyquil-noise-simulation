@@ -15,14 +15,14 @@ How much time each gate takes?
 
 # To us
 
-Insert calibration into noise function
-
 Implement everything from scratch
 
 Build new implementation for:
 1. apply_noise_model
 2. _decoherence_noise_model
 
-without get_noisy_gate
-
 write Emanuellles quil program
+
+insert fidelity?
+
+r_n+1 -> f*(U*r_n*U^+)+(1-f)I
