@@ -1,21 +1,26 @@
 import requests
 import json
+from typing import Optional
+from pyquil.api import QuantumComputer
 
 class Calibrations:
     """
     encapsulate the calibration data for Aspen-M-2 or Aspen-M-3 machine.
 
-    args: QPU (int, optional): Choose between 2 or 3 (Aspen-M-2 or Aspen-M-3) Defaults to 2.
+    args: qc (QuantumComputer, optional): a Quantum Computer (Aspen-M-2 or Aspen-M-3). 
+    Defaults to None, where the user can define his own calibration data.
     """
 
-    def __init__(self, QPU: int=2) -> None:
-        if QPU == 0:
-            pass    # user can set his own values
-        elif QPU not in [2,3]:
-            raise ValueError("QPU must be 2 or 3 as in Aspen-M-2 or Aspen-M-3")
+    def __init__(self, qc: Optional[QuantumComputer]=None) -> None:
+        if qc == None:
+            return    # user can set his own values
         else:
-            url = "https://forest-server.qcs.rigetti.com/lattices/Aspen-M-"
-            response = requests.get(url + str(QPU))
+            qc_name = get_qc_name(qc)
+        if qc_name not in ["Aspen-M-2", "Aspen-M-3"]:
+            raise ValueError("qc must be Aspen-M-2 or Aspen-M-3")
+        else:
+            url = "https://forest-server.qcs.rigetti.com/lattices/"
+            response = requests.get(url + qc_name)
             file = json.loads(response.text)
             self.calibrations = file["lattice"]["specs"]
             self.T1, self.T2, self.fidelity_1q, self.readout = self.create_1q_dicts()
@@ -211,3 +216,15 @@ def get_readout_fidelity(qc_name="Aspen-M-2"):
     readout = [calibrations['1Q'][q]["fRO"] for q in qs]
     intqs = [int(q) for q in qs]
     return dict(zip(intqs,readout))
+
+def get_qc_name(qc: QuantumComputer):
+    """
+    returns the name of the quantum computer `qc`, 
+    without the ending 'qvm' if it exists.
+    """
+    name = qc.name
+    if (name[-4:] == "-qvm"):
+        name = name[0:-4]
+        return name
+    else:
+        return name

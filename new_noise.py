@@ -12,7 +12,7 @@ from pyquil.quil import Program
 from pyquil.api import QuantumComputer
 from pyquil.noise import NoiseModel, KrausModel, _get_program_gates, INFINITY
 from pyquil.noise import damping_kraus_map, dephasing_kraus_map, combine_kraus_maps
-from Calibrations import Calibrations, get_T_values, get_readout_fidelity
+from Calibrations import Calibrations
 
 Noisy_I_1Q_name = "Noisy_I_1Q_gate"
 Noisy_I_2Q_name = "Noisy_I_2Q_gate"
@@ -69,7 +69,7 @@ def create_noise_model(
     gates: Sequence[Gate],
     T1: Dict[int, float],
     T2: Dict[int, float],
-    ro_fidelity: Dict[int, float],
+    ro_fidelity: Optional[Dict[int, float]]=None,
     gate_time_1q: float = 40e-9,
     gate_time_2q: float = 180e-09,
     ) -> NoiseModel:
@@ -113,8 +113,9 @@ def create_noise_model(
         )
 
     aprobs = {}
-    for q, f_ro in ro_fidelity.items():
-        aprobs[q] = np.array([[f_ro, 1.0 - f_ro], [1.0 - f_ro, f_ro]])
+    if ro_fidelity != None:
+        for q, f_ro in ro_fidelity.items():
+            aprobs[q] = np.array([[f_ro, 1.0 - f_ro], [1.0 - f_ro, f_ro]])
 
     return NoiseModel(kraus_maps, aprobs)
 
@@ -122,9 +123,9 @@ def add_decoherence_noise_to_I(
     prog: Program,
     T1: Dict[int, float],
     T2: Dict[int, float],
-    ro_fidelity: Dict[int, float],
     gate_time_1q: float = 40e-9,
     gate_time_2q: float = 180e-09,
+    ro_fidelity: Optional[Dict[int, float]]=None,
 ) -> Program:
     """
     Applies the model on the different kindes of I.
@@ -140,7 +141,9 @@ def add_decoherence_noise_to_I(
     gates = [i for i in _get_program_gates(prog) 
             if (i.name == Noisy_I_1Q_name) or (i.name == Noisy_I_2Q_name)]
     # define readout fidelity dict for all qubits in the program:
-    ro_fidelity_prog_qubits = {q: ro_fidelity[q] for q in prog.get_qubits()}
+    ro_fidelity_prog_qubits = {}
+    if ro_fidelity != None:
+        ro_fidelity_prog_qubits = {q: ro_fidelity[q] for q in prog.get_qubits()}
     noise_model = create_noise_model(
         gates,
         T1=T1,
@@ -153,8 +156,9 @@ def add_decoherence_noise_to_I(
     for k in noise_model.gates:
         prog.define_noisy_gate(k.gate, k.targets, k.kraus_ops)
     # add readout noise pragmas
-    for q, ap in noise_model.assignment_probs.items():
-        prog.define_noisy_readout(q, p00=ap[0, 0], p11=ap[1, 1])
+    if ro_fidelity != None:
+        for q, ap in noise_model.assignment_probs.items():
+            prog.define_noisy_readout(q, p00=ap[0, 0], p11=ap[1, 1])
     return prog
 
 def add_noise_to_program(
@@ -196,29 +200,15 @@ def add_noise_to_program(
                     for q in qubits:
                         if q not in targets or not noise_types.fidelity:
                             new_p += Noisy_I_2Q_gate(q)
-    qc_name = get_qc_name(qc)
-    if calibrations != None:
-        T1 = calibrations.T1
-        T2 = calibrations.T2
-        readout_fidelity = calibrations.readout
-    else:
-        T1, T2 = get_T_values(qc_name)
-        readout_fidelity = get_readout_fidelity(qc_name)
-    new_p = add_decoherence_noise_to_I(prog=new_p, T1=T1, T2=T2, ro_fidelity=readout_fidelity)
+    if calibrations == None:
+        calibrations = Calibrations(qc=qc)
+    new_p = add_decoherence_noise_to_I(
+        prog=new_p, 
+        T1=calibrations.T1, 
+        T2=calibrations.T2, 
+        ro_fidelity = calibrations.readout if noise_types.readout else None)
     new_p.wrap_in_numshots_loop(p.num_shots)    # wrap in original programs numshots
     return new_p
-
-def get_qc_name(qc: QuantumComputer):
-    """
-    returns the name of the quantum computer `qc`, 
-    without the ending 'qvm' if it exists.
-    """
-    name = qc.name
-    if (name[-4:] == "-qvm"):
-        name = name[0:-4]
-        return name
-    else:
-        return name
 
 def define_noisy_I_gates(p: Program, noise_types: Noise_types):
     """
