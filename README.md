@@ -15,13 +15,13 @@ How much time each gate takes?
 
 # To us
 
-Implement everything from scratch
+add options to add noisy I only on the operating qubit or on all (for 1q and 2q gates)
 
-Build new implementation for:
-1. apply_noise_model
-2. _decoherence_noise_model
+add delay implementation
 
-write Emanuellles quil program
+
+
+
 
 insert fidelity?
 
