@@ -164,7 +164,7 @@ def add_decoherence_noise_to_I(
 def add_noise_to_program(
     qc: QuantumComputer, 
     p: Program, 
-    is_native: bool=False,
+    convert_to_native: bool=False,
     calibrations: Optional[Calibrations] = None,
     noise_types: Noise_types = Noise_types()
     ):
@@ -174,7 +174,7 @@ def add_noise_to_program(
     This function will define new I gates and add Kraus noise to these gates.
     :param qc: A Quantum computer object
     :param p: A pyquil program
-    :param is_native: bool, should be `True` if the program is already in native pyquil
+    :param convert_to_native: bool, put `False` if the program is already in native pyquil or is not needed.
     :param calibrations: optional, can get the calibrations in advance, 
         instead of producing them from the URL.
     :param noise_types: can define what types of noise to add to the program.
@@ -182,14 +182,21 @@ def add_noise_to_program(
     :return: A new program with noisy operators.
     """
     new_p = Program()
-    if not is_native:
+    if convert_to_native:
         p = qc.compiler.quil_to_native_quil(p)
     Noisy_I_2Q_gate = define_noisy_I_gates(new_p, noise_types)
     qubits = p.get_qubits()
     for i in p:
         new_p += i
+        if isinstance(i, Pragma):
+            if (i.command == "DELAY"):
+               # TODO: add noise to delay
+                pass
         if isinstance(i, Gate):
             targets = tuple(t.index for t in i.qubits)
+            if Gate.name == "DELAY":
+                # TODO: add noise to delay
+                pass
             # for 2-qubit gates, add decoherence noise for all qubits in qc
             if len(targets) == 2:
                 if noise_types.fidelity:
