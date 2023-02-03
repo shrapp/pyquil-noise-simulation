@@ -171,6 +171,53 @@ def add_readout_noise(
         prog.define_noisy_readout(q, p00=ap[0, 0], p11=ap[1, 1])
     return prog
 
+def replace_delay_with_noisy_I(p: Program):
+    """
+    replace the instructions of type `DelayQubits` with `noisy-I` gates.
+
+    :param p: a program. 
+
+    :return: `new_p`: a converted program. 
+    :return: `noisy_gates`: info about the gates that replace `DELAY`.
+    """
+    noisy_gates = []
+    new_p = Program()
+    new_p._defined_gates = p._defined_gates
+    idx = 0
+    for i in p:
+        if isinstance(i, DelayQubits):
+            dg = DefGate("Noisy-DELAY-"+str(idx), np.eye(2))
+            new_p += dg
+            noisy_gates.append({"gate_name": "Noisy-DELAY-"+str(idx), "duration": i.duration})
+            gate = dg.get_constructor()
+            for q in i.qubits:
+                new_p += gate(q)
+            idx += 1
+        else:
+            new_p += i
+    return new_p, noisy_gates
+
+
+def add_delay_maps(prog, gate_info, T1, T2):
+    """
+    Add kraus maps for a `DELAY` instruction, 
+    that was converted already into `noisy-I` gate.
+
+    :param prog: the program to add the maps to.
+    :param gate_info: a Dictionary with the gates name and duration.
+    :param T1: Dictionary with T1 times.
+    :param T2: Dictionary with T2 times.
+    """
+    gates = [i for i in _get_program_gates(prog) if i.name == gate_info["gate_name"]]
+    noise_model = create_noise_model(
+        gates,
+        T1=T1,
+        T2=T2,
+        gate_time=gate_info["duration"],
+    )
+    for k in noise_model.gates:
+        prog.define_noisy_gate(k.gate, k.targets, k.kraus_ops)
+
 def add_noise_to_program(
     qc: QuantumComputer, 
     p: Program, 
@@ -200,13 +247,11 @@ def add_noise_to_program(
         new_p += definition
     for i in p:
         new_p += i
-        if isinstance(i, Pragma):
-            if (i.command == "DELAY"):
-               # TODO: add noise to delay
-                pass
-        if isinstance(i, DelayQubits):
-            # TODO: add noise to delay
-            pass
+        # !!! for now, we dealt with Delays of type `DelayQubits` in a different function.
+        # if isinstance(i, Pragma):
+        #     if (i.command == "DELAY"):
+        #        # TODO: add noise to delay
+        #         pass
         if isinstance(i, Gate):
             targets = tuple(t.index for t in i.qubits)
             # for 2-qubit gates, add decoherence noise for all qubits in qc
@@ -228,6 +273,10 @@ def add_noise_to_program(
                     for q in qubits:
                         if q not in targets or not noise_types.fidelity:
                             new_p += noise_types.gates[Noisy_I_1Q_name](q)
+    
+    # deal with delay:
+    new_p, delay_gates = replace_delay_with_noisy_I(new_p)
+    
     if calibrations == None:
         calibrations = Calibrations(qc=qc)
     
@@ -237,5 +286,8 @@ def add_noise_to_program(
     if noise_types.readout:
         new_p = add_readout_noise(prog=new_p, ro_fidelity=calibrations.readout)
     
+    for gate in delay_gates:
+        add_delay_maps(new_p, gate, calibrations.T1, calibrations.T2)
+
     new_p.wrap_in_numshots_loop(p.num_shots)    # wrap in original programs numshots
     return new_p
