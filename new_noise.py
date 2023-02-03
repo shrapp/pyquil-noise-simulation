@@ -196,24 +196,22 @@ def replace_delay_with_noisy_I(p: Program):
 	new_p._defined_gates = p._defined_gates
 	idx = 0
 	for i in p:
+		if not (isinstance(i, DelayQubits) or (isinstance(i, Pragma) and i.command == "DELAY")):
+			new_p += i
+			continue
+		dg = DefGate("Noisy-DELAY-" + str(idx), np.eye(2))
+		new_p += dg
+		gate = dg.get_constructor()
 		if isinstance(i, DelayQubits):
-			dg = DefGate("Noisy-DELAY-" + str(idx), np.eye(2))
-			new_p += dg
-			noisy_gates.append({"gate_name": "Noisy-DELAY-" + str(idx), "duration": i.duration})
-			gate = dg.get_constructor()
+			duration = i.duration
 			for q in i.qubits:
 				new_p += gate(q)
-			idx += 1
-		elif isinstance(i, Pragma) and i.command == "DELAY":
-			dg = DefGate("Noisy-DELAY-" + str(idx), np.eye(2))
-			new_p += dg
-			noisy_gates.append({"gate_name": "Noisy-DELAY-" + str(idx), "duration": float(i.args[-1])})
-			gate = dg.get_constructor()
+		else:  # pragma
+			duration = float(i.args[-1])
 			for q in i.args[1:-1]:
 				new_p += gate(Qubit(q))
-			idx += 1
-		else:
-			new_p += i
+		noisy_gates.append({"gate_name": "Noisy-DELAY-" + str(idx), "duration": duration})
+		idx += 1
 	return new_p, noisy_gates
 
 
