@@ -1,18 +1,20 @@
 ##############################################################################
-# Written by Shahar Rapp and Ze'ev Binnes, added on Rigettis pyquil.
+# Written by Shahar Rapp and Ze'ev Binnes, added on Rigetti's pyquil.
 #
 #    A new noise model based on pyquil.noise,
 #    which works by adding "noisy I" gates after long operations.
 ##############################################################################
 
-from typing import Dict, List, Sequence, Optional
+from typing import Dict, List, Sequence, Optional, Tuple, Any
+
 import numpy as np
-from pyquil.quilatom import Qubit
-from pyquil.quilbase import Gate, DefGate, Pragma, DelayQubits
-from pyquil.quil import Program
 from pyquil.api import QuantumComputer
 from pyquil.noise import NoiseModel, KrausModel, _get_program_gates, INFINITY
 from pyquil.noise import damping_kraus_map, dephasing_kraus_map, combine_kraus_maps
+from pyquil.quil import Program
+from pyquil.quilatom import Qubit
+from pyquil.quilbase import Gate, DefGate, Pragma, DelayQubits
+
 from Calibrations import Calibrations
 
 Noisy_I_1Q_name = "Noisy_I_gate_for_1Q"
@@ -182,7 +184,7 @@ def add_readout_noise(
 	return prog
 
 
-def replace_delay_with_noisy_I(p: Program):
+def replace_delay_with_noisy_I(p: Program) -> Tuple[Program, List[Dict[str, Any]]]:
 	"""
     replace the instructions of type `DelayQubits` with `noisy-I` gates.
 
@@ -215,7 +217,7 @@ def replace_delay_with_noisy_I(p: Program):
 	return new_p, noisy_gates
 
 
-def add_delay_maps(prog, gate_info, T1, T2):
+def add_delay_maps(prog: Program, gate_info: Dict[str, Any], T1: Dict[int, float], T2: Dict[int, float]) -> None:
 	"""
     Add kraus maps for a `DELAY` instruction, 
     that was converted already into `noisy-I` gate.
@@ -242,11 +244,11 @@ def add_noise_to_program(
 		convert_to_native: bool = True,
 		calibrations: Optional[Calibrations] = None,
 		noise_types: NoiseTypes = NoiseTypes()
-):
+) -> Program:
 	"""
     Add generic damping and dephasing noise to a program.
     Noise is added to all qubits, after a 2-qubit gate operation.
-    This function will define new I gates and add Kraus noise to these gates.
+    This function will define new "I" gates and add Kraus noise to these gates.
     :param qc: A Quantum computer object
     :param p: A pyquil program
     :param convert_to_native: bool, put `False` if the program is already in native pyquil or is not needed.
