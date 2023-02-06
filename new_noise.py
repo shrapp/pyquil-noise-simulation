@@ -9,8 +9,8 @@ from typing import Dict, List, Sequence, Optional, Tuple, Any
 
 import numpy as np
 from pyquil.api import QuantumComputer
-from pyquil.noise import NoiseModel, KrausModel, _get_program_gates, INFINITY
-from pyquil.noise import damping_kraus_map, dephasing_kraus_map, combine_kraus_maps
+from pyquil.noise import NoiseModel, KrausModel, _get_program_gates, INFINITY, pauli_kraus_map, damping_kraus_map, \
+	dephasing_kraus_map, combine_kraus_maps
 from pyquil.quil import Program
 from pyquil.quilatom import Qubit
 from pyquil.quilbase import Gate, DefGate, Pragma, DelayQubits
@@ -306,3 +306,19 @@ def add_noise_to_program(
 
 	new_p.wrap_in_numshots_loop(p.num_shots)  # wrap in original program's numshots
 	return new_p
+
+
+def depolarizing_noise(num_qubits: int, p: float = .95) -> List[np.ndarray]:
+	"""
+    Generate the Kraus operators corresponding to a given unitary
+    single qubit gate followed by a depolarizing noise channel.
+
+    :params float num_qubits: either 1 or 2 qubit channel supported
+    :params float p: parameter in depolarizing channel as defined by: p $\rho$ + (1-p)/d I
+    :return: A list, eg. [k0, k1, k2, k3], of the Kraus operators that parametrize the map.
+    :rtype: list
+    """
+	num_of_operators = 4 ** num_qubits
+	probabilities = [p + (1.0 - p) / num_of_operators]
+	probabilities += [(1.0 - p) / num_of_operators] * (num_of_operators - 1)
+	return pauli_kraus_map(probabilities)
