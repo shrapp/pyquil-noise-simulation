@@ -1,6 +1,7 @@
-import requests
 import json
 from typing import Optional
+
+import requests
 from pyquil.api import QuantumComputer
 
 
