@@ -45,13 +45,20 @@ class NoiseTypes:
 
 	def define_noisy_gates(self) -> None:
 		if self.decoherence_2Q:
+			# future improvement may add implementation for different times of 2Q gates
 			dg = DefGate(Noisy_I_2Q_name, np.eye(2))
 			self.definitions[Noisy_I_2Q_name] = dg
 			self.gates[Noisy_I_2Q_name] = dg.get_constructor()
 		if self.decoherence_1Q:
+			# future improvement may add implementation for different times of 1Q gates
 			dg = DefGate(Noisy_I_1Q_name, np.eye(2))
 			self.definitions[Noisy_I_1Q_name] = dg
 			self.gates[Noisy_I_1Q_name] = dg.get_constructor()
+		if self.fidelity:
+			for name in ["Depolarising_1Q_gate", "Depolarising_CPHZE", "Depolarising_CZ", "Depolarising_XY"]:
+				dg = DefGate(name, np.eye(2))
+				self.definitions[name] = dg
+				self.gates[name] = dg.get_constructor()
 
 
 def damping_after_dephasing(T1: float, T2: float, gate_time: float) -> List[np.ndarray]:
@@ -263,6 +270,7 @@ def add_noise_to_program(
 	qubits = p.get_qubits()
 
 	new_p = Program()
+	# TODO: add only the gates that are used in the program
 	for definition in noise_types.definitions.values():
 		new_p += definition
 	for i in p:
@@ -272,9 +280,7 @@ def add_noise_to_program(
 			# for 2-qubit gates, add decoherence noise for all qubits in qc
 			if len(targets) == 2:
 				if noise_types.fidelity:
-					for q in targets:
-						# new_p += Noisy_I_2Q_fidelity(q)
-						continue
+					new_p += noise_types.gates["Depolarising_" + i.name](targets)
 				if noise_types.decoherence_2Q:
 					for q in qubits:
 						if q not in targets or not noise_types.fidelity:
@@ -308,7 +314,7 @@ def add_noise_to_program(
 	return new_p
 
 
-def depolarizing_noise(num_qubits: int, p: float = .95) -> List[np.ndarray]:
+def depolarizing_kraus(num_qubits: int, p: float = .95) -> List[np.ndarray]:
 	"""
     Generate the Kraus operators corresponding to a given unitary
     single qubit gate followed by a depolarizing noise channel.
@@ -322,3 +328,5 @@ def depolarizing_noise(num_qubits: int, p: float = .95) -> List[np.ndarray]:
 	probabilities = [p + (1.0 - p) / num_of_operators]
 	probabilities += [(1.0 - p) / num_of_operators] * (num_of_operators - 1)
 	return pauli_kraus_map(probabilities)
+
+
