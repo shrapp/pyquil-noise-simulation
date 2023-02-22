@@ -14,8 +14,6 @@ one parameter to control noise intensity
 
 move noisy I constructor into the loop
 
-GHZ example
-
 add options to add noisy I only on the operating qubit or on all (for 1q and 2q gates)
 
 presentation
