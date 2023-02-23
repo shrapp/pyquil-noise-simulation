@@ -320,6 +320,11 @@ def add_noise_to_program(
 		convert_to_native: bool = True,
 		calibrations: Optional[Calibrations] = None,
 		noise_types: NoiseTypes = NoiseTypes()
+		# decoherence_after_1q_gate: bool = False,
+		# decoherence_after_2q_gate: bool = True,
+		# decoherence_only_on_targets: bool = False,
+		# depolarizing: bool = True,
+		# readout: bool = True
 ) -> Program:
 	"""
     Add generic damping and dephasing noise to a program.
@@ -404,5 +409,4 @@ def depolarizing_kraus(num_qubits: int, p: float = .95) -> List[np.ndarray]:
 	probabilities = [p + (1.0 - p) / num_of_operators]
 	probabilities += [(1.0 - p) / num_of_operators] * (num_of_operators - 1)
 	return pauli_kraus_map(probabilities)
-
 
