@@ -55,8 +55,11 @@ class NoiseTypes:
 			self.definitions[Noisy_I_1Q_name] = dg
 			self.gates[Noisy_I_1Q_name] = dg.get_constructor()
 		if self.fidelity:
-			for name in ["Depolarising_1Q_gate", "Depolarising_CPHZE", "Depolarising_CZ", "Depolarising_XY"]:
-				dg = DefGate(name, np.eye(2))
+			dg = DefGate("Depolarising_1Q_gate", np.eye(2))
+			self.definitions["Depolarising_1Q_gate"] = dg
+			self.gates["Depolarising_1Q_gate"] = dg.get_constructor()
+			for name in ["Depolarising_CPHZE", "Depolarising_CZ", "Depolarising_XY"]:
+				dg = DefGate(name, np.eye(4))
 				self.definitions[name] = dg
 				self.gates[name] = dg.get_constructor()
 
@@ -190,6 +193,72 @@ def add_readout_noise(
 		prog.define_noisy_readout(q, p00=ap[0, 0], p11=ap[1, 1])
 	return prog
 
+def create_depolarizing_noise_model(
+		gates: Sequence[Gate],
+		p: Dict,
+		num_qubits: int
+) -> NoiseModel:
+
+	all_qubits = []
+	for g in gates:
+		qubits = [t.index for t in g.qubits]
+		qubits.sort(key = lambda x: int(x))
+		if qubits is None:
+			qubits = []
+		if len(qubits) > 1:
+			all_qubits.append(str(qubits[0])+'-'+str(qubits[1]))
+		elif len(qubits) == 1:
+			all_qubits.append(qubits[0])
+	all_qubits = set(all_qubits)
+		
+	# all_qubits = set(sum(([t.index for t in g.qubits] for g in gates), [])) # should have also touples
+
+	noisy_identities = {
+		q: depolarizing_kraus(num_qubits, p.get(q, 1.0)) for q in all_qubits # 1 is wrong
+	}
+	kraus_maps = []
+	for g in gates:
+		targets = tuple(t.index for t in g.qubits)
+		qq = targets
+		if num_qubits > 1:
+			qq = sorted(list(targets))
+			qq = [str(qq[0])+'-'+str(qq[1])]
+		noisy_I = noisy_identities[qq[0]]
+
+		kraus_maps.append(
+			KrausModel(
+				g.name,
+				tuple(g.params),
+				targets,
+				noisy_I,
+				1.0,  # will be fixed
+			)
+		)
+	return NoiseModel(kraus_maps, {})
+
+
+def add_depolarizing_noise(prog: Program, p: Dict[str, Dict[int, float]]):
+
+	gates = [i for i in _get_program_gates(prog) if i.name == "Depolarising_1Q_gate"]
+	noise_model = create_depolarizing_noise_model(
+		gates,
+		p=p["Depolarising_1Q_gate"], 
+		num_qubits=1
+	)
+	for k in noise_model.gates:
+		prog.define_noisy_gate(k.gate, k.targets, k.kraus_ops)
+
+	for name in ["Depolarising_CPHZE", "Depolarising_CZ", "Depolarising_XY"]:
+		gates = [i for i in _get_program_gates(prog) if i.name == name]
+		noise_model = create_depolarizing_noise_model(
+			gates,
+			p=p[name], 
+			num_qubits=2
+		)
+		for k in noise_model.gates:
+			prog.define_noisy_gate(k.gate, k.targets, k.kraus_ops)
+	return prog
+
 
 def replace_delay_with_noisy_I(p: Program) -> Tuple[Program, List[Dict[str, Any]]]:
 	"""
@@ -280,7 +349,7 @@ def add_noise_to_program(
 			# for 2-qubit gates, add decoherence noise for all qubits in qc
 			if len(targets) == 2:
 				if noise_types.fidelity:
-					new_p += noise_types.gates["Depolarising_" + i.name](targets)
+					new_p += noise_types.gates["Depolarising_" + i.name](targets[0], targets[1])
 				if noise_types.decoherence_2Q:
 					for q in qubits:
 						if q not in targets or not noise_types.fidelity:
@@ -288,8 +357,7 @@ def add_noise_to_program(
 			elif len(targets) == 1:
 				if noise_types.fidelity:
 					for q in targets:
-						# new_p += Noisy_I_1Q_fidelity(q)
-						continue
+						new_p += noise_types.gates["Depolarising_1Q_gate"](targets[0])
 				if noise_types.decoherence_1Q:
 					for q in qubits:
 						if q not in targets or not noise_types.fidelity:
@@ -300,6 +368,14 @@ def add_noise_to_program(
 
 	if calibrations is None:
 		calibrations = Calibrations(qc=qc)
+
+	if noise_types.fidelity:
+
+		new_p = add_depolarizing_noise(prog=new_p, p={
+			"Depolarising_1Q_gate": calibrations.fidelity_1q, 
+			"Depolarising_CPHZE": calibrations.fidelity_CPHASE, 
+			"Depolarising_CZ": calibrations.fidelity_CZ,
+			"Depolarising_XY": calibrations.fidelity_XY})
 
 	# add kraus maps declarations:
 	if noise_types.decoherence_1Q or noise_types.decoherence_2Q:
