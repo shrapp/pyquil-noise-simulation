@@ -26,6 +26,7 @@ class Calibrations:
 			file = json.loads(response.text)
 			self.calibrations = file["lattice"]["specs"]
 			self.T1, self.T2, self.fidelity_1q, self.readout = self.create_1q_dicts()
+			self.create_2q_dicts()
 
 	def create_1q_dicts(self):
 		qs = self.calibrations['1Q'].keys()
@@ -36,6 +37,17 @@ class Calibrations:
 		qubits_indexes = [int(q) for q in qs]
 		return (dict(zip(qubits_indexes, t1)), dict(zip(qubits_indexes, t2)),
 		        dict(zip(qubits_indexes, fidelities)), dict(zip(qubits_indexes, readout)))
+
+	def create_2q_dicts(self):
+		pairs = self.calibrations['2Q'].keys()
+		# set_pairs = [set(int(q) for q in pair.split('-')) for pair in pairs]
+		cphase = [self.calibrations['2Q'][pair].get("fCPHASE", 1.0) for pair in pairs]
+		self.fidelity_CPHASE = dict(zip(pairs, cphase))
+		cz = [self.calibrations['2Q'][pair].get("fCZ", 1.0) for pair in pairs]
+		self.fidelity_CZ = dict(zip(pairs, cz))
+		xy = [self.calibrations['2Q'][pair].get("fXY", 1.0) for pair in pairs]
+		self.fidelity_XY = dict(zip(pairs, xy))
+
 
 	def t1(self, Q: int = 0) -> float:
 		"""
