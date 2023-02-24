@@ -6,13 +6,13 @@
 
 # To us
 
-insert fidelity, add pragma if gate isn't found - V
+V - insert fidelity, add pragma if gate isn't found
 
 Investigate Riggeti's implementation KrausModel NoiseModel
 
 conditional delay in decoherence_only_on_targets
 
-one parameter to control noise intensity
+V - one parameter to control noise intensity
 
 presentation
 

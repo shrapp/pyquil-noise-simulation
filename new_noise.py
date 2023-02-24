@@ -94,6 +94,34 @@ class Calibrations:
 		else:
 			return name
 
+	def create_from_other(self, cal):
+		self.T1 = cal.T1.copy()
+		self.T2 = cal.T2.copy()
+		self.fidelity_1q = cal.fidelity_1q.copy()
+		self.readout_fidelity = cal.readout_fidelity.copy()
+		self.fidelity_CPHASE = cal.fidelity_CPHASE.copy()
+		self.fidelity_CZ = cal.fidelity_CZ.copy()
+		self.fidelity_XY = cal.fidelity_XY.copy()
+
+	def change_noise_intensity(self, intensity: float):
+		self.T1 = self.change_times_by_ratio(self.T1, intensity)
+		self.T2 = self.change_times_by_ratio(self.T2, intensity)
+		self.fidelity_1q = self.change_fidelity_by_noise_intensity(self.fidelity_1q, intensity)
+		self.readout_fidelity = self.change_fidelity_by_noise_intensity(self.readout_fidelity, intensity)
+		self.fidelity_CPHASE = self.change_fidelity_by_noise_intensity(self.fidelity_CPHASE, intensity)
+		self.fidelity_CZ = self.change_fidelity_by_noise_intensity(self.fidelity_CZ, intensity)
+		self.fidelity_XY = self.change_fidelity_by_noise_intensity(self.fidelity_XY, intensity)
+
+	def change_times_by_ratio(self, dict: Dict, ratio: float):
+		for key in dict.keys():
+			dict[key] = dict[key] / (ratio + 1e-10)
+		return dict
+	
+	def change_fidelity_by_noise_intensity(self, dict:Dict, intensity:float):
+		for key in dict.keys():
+			dict[key] = max(0.0, min(1.0, 1 - ((1 - dict[key]) * intensity)))
+		return dict
+
 
 
 def damping_after_dephasing(T1: float, T2: float, gate_time: float) -> List[np.ndarray]:
@@ -423,7 +451,7 @@ def add_noise_to_program(
 		decoherence_after_2q_gate: bool = True,
 		# TODO decoherence_only_on_targets: bool = False,
 		readout_noise: bool = True,
-		# noise_amount: float = 1.0
+		noise_intensity: float = 1.0
 ) -> Program:
 	"""
     Add generic damping and dephasing noise to a program.
@@ -482,6 +510,11 @@ def add_noise_to_program(
 
 	if calibrations is None:
 		calibrations = Calibrations(qc=qc)
+	if noise_intensity != 1.0:
+		new_calibrations = Calibrations()
+		new_calibrations.create_from_other(calibrations)
+		new_calibrations.change_noise_intensity(noise_intensity)
+		calibrations = new_calibrations
 
 	# add kraus maps declarations:
 	if depolarizing:
