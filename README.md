@@ -6,7 +6,7 @@
 
 # To us
 
-insert fidelity, add pragma if gate isn't found - Zeev
+insert fidelity, add pragma if gate isn't found - V
 
 Investigate Riggeti's implementation KrausModel NoiseModel
 

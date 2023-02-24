@@ -17,7 +17,7 @@ class Calibrations:
 		if qc is None:
 			return  # user can set his own values
 		else:
-			qc_name = get_qc_name(qc)
+			qc_name = self.get_qc_name(qc)
 		if qc_name not in ["Aspen-M-2", "Aspen-M-3"]:
 			raise ValueError("qc must be Aspen-M-2 or Aspen-M-3")
 		else:
@@ -25,7 +25,7 @@ class Calibrations:
 			response = requests.get(url + qc_name)
 			file = json.loads(response.text)
 			self.calibrations = file["lattice"]["specs"]
-			self.T1, self.T2, self.fidelity_1q, self.readout = self.create_1q_dicts()
+			self.create_1q_dicts()
 			self.create_2q_dicts()
 
 	def create_1q_dicts(self):
@@ -35,18 +35,31 @@ class Calibrations:
 		fidelities = [self.calibrations['1Q'][q]["f1QRB"] for q in qs]
 		readout = [self.calibrations['1Q'][q]["fRO"] for q in qs]
 		qubits_indexes = [int(q) for q in qs]
-		return (dict(zip(qubits_indexes, t1)), dict(zip(qubits_indexes, t2)),
-		        dict(zip(qubits_indexes, fidelities)), dict(zip(qubits_indexes, readout)))
+		self.T1 = dict(zip(qubits_indexes, t1))
+		self.T2 = dict(zip(qubits_indexes, t2))
+		self.fidelity_1q = dict(zip(qs, fidelities))
+		self.readout_fidelity = dict(zip(qubits_indexes, readout))
 
 	def create_2q_dicts(self):
 		pairs = self.calibrations['2Q'].keys()
-		# set_pairs = [set(int(q) for q in pair.split('-')) for pair in pairs]
 		cphase = [self.calibrations['2Q'][pair].get("fCPHASE", 1.0) for pair in pairs]
 		self.fidelity_CPHASE = dict(zip(pairs, cphase))
 		cz = [self.calibrations['2Q'][pair].get("fCZ", 1.0) for pair in pairs]
 		self.fidelity_CZ = dict(zip(pairs, cz))
 		xy = [self.calibrations['2Q'][pair].get("fXY", 1.0) for pair in pairs]
 		self.fidelity_XY = dict(zip(pairs, xy))
+
+	def get_qc_name(self, qc: QuantumComputer):
+		"""
+		returns the name of the quantum computer `qc`, 
+		without the ending 'qvm' if it exists.
+		"""
+		name = qc.name
+		if name[-4:] == "-qvm":
+			name = name[0:-4]
+			return name
+		else:
+			return name
 
 
 	def t1(self, Q: int = 0) -> float:
