@@ -8,7 +8,7 @@
 
 V - insert fidelity, add pragma if gate isn't found
 
-Investigate Riggeti's implementation KrausModel NoiseModel
+V - Investigate Riggeti's implementation KrausModel NoiseModel
 
 conditional delay in decoherence_only_on_targets
 
