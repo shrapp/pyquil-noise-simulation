@@ -51,18 +51,6 @@ def change_fidelity_by_noise_intensity(fidelity: Dict, intensity: float):
 	return fidelity
 
 
-def duplicate_calibration(cal):
-	new_cal = Calibrations()
-	new_cal.T1 = cal.T1.copy()
-	new_cal.T2 = cal.T2.copy()
-	new_cal.fidelity_1q = cal.fidelity_1q.copy()
-	new_cal.readout_fidelity = cal.readout_fidelity.copy()
-	new_cal.fidelity_CPHASE = cal.fidelity_CPHASE.copy()
-	new_cal.fidelity_CZ = cal.fidelity_CZ.copy()
-	new_cal.fidelity_XY = cal.fidelity_XY.copy()
-	return new_cal
-
-
 class Calibrations:
 	"""
     encapsulate the calibration data for Aspen-M-2 or Aspen-M-3 machine.
@@ -83,7 +71,7 @@ class Calibrations:
 	this may change in time, and require changes in the class.
     """
 
-	def __init__(self, qc: Optional[QuantumComputer] = None):
+	def __init__(self, qc: Optional[QuantumComputer] = None, cal=None):
 		self.fidelity_XY = None
 		self.fidelity_CZ = None
 		self.fidelity_CPHASE = None
@@ -91,6 +79,17 @@ class Calibrations:
 		self.fidelity_1q = None
 		self.T2 = None
 		self.T1 = None
+
+		if cal is not None:
+			self.T1 = cal.T1.copy()
+			self.T2 = cal.T2.copy()
+			self.fidelity_1q = cal.fidelity_1q.copy()
+			self.readout_fidelity = cal.readout_fidelity.copy()
+			self.fidelity_CPHASE = cal.fidelity_CPHASE.copy()
+			self.fidelity_CZ = cal.fidelity_CZ.copy()
+			self.fidelity_XY = cal.fidelity_XY.copy()
+			return
+
 		if qc is None:
 			return  # user can set his own values
 		else:
@@ -311,7 +310,7 @@ def _add_depolarizing_noise(prog: Program, fidelities: Dict[str, Dict[str, float
 	return prog
 
 
-def _add_delay_maps(prog: Program, delay_gates: Dict[str, float], T1: Dict[int, float], T2: Dict[int, float])\
+def _add_delay_maps(prog: Program, delay_gates: Dict[str, float], T1: Dict[int, float], T2: Dict[int, float]) \
 		-> Program:
 	"""
     Add kraus maps for a `DELAY` instruction,
@@ -524,7 +523,7 @@ def add_noise_to_program(
 	if calibrations is None:
 		calibrations = Calibrations(qc=qc)
 	if noise_intensity != 1.0:
-		new_calibrations = duplicate_calibration(calibrations)
+		new_calibrations = Calibrations(cal=calibrations)
 		new_calibrations.change_noise_intensity(noise_intensity)
 		calibrations = new_calibrations
 
