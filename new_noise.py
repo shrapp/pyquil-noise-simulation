@@ -12,7 +12,7 @@ import numpy as np
 import requests
 from pyquil.api import QuantumComputer
 from pyquil.noise import INFINITY, pauli_kraus_map, damping_kraus_map, \
-	dephasing_kraus_map, combine_kraus_maps
+	dephasing_kraus_map, combine_kraus_maps, _get_program_gates
 from pyquil.quil import Program
 from pyquil.quilatom import Qubit
 from pyquil.quilbase import Gate, DefGate, Pragma, DelayQubits
@@ -196,7 +196,7 @@ def create_decoherence_kraus_maps(
 
 
 def _create_kraus_maps(prog, gate_name, gate_time, T1, T2):
-	gates = [i for i in prog if (isinstance(i, Gate) and i.name == gate_name)]
+	gates = [i for i in _get_program_gates(prog) if i.name == gate_name]
 	kraus_maps = create_decoherence_kraus_maps(
 		gates,
 		T1=T1,
@@ -304,14 +304,15 @@ def _add_depolarizing_noise(prog: Program, fidelities: Dict[str, Dict[str, float
 	"""
 
 	for name in [Depolarizing_1Q_gate, Depolarizing_CPHASE, Depolarizing_CZ, Depolarizing_XY]:
-		gates = [i for i in prog if (isinstance(i, Gate) and i.name == name)]
+		gates = [i for i in _get_program_gates(prog) if i.name == name]
 		noise_model = _create_depolarizing_kraus_maps(gates, fidelities[name])
 		for k in noise_model:
 			prog.define_noisy_gate(k["gate"], k["targets"], k["kraus_ops"])
 	return prog
 
 
-def _add_delay_maps(prog: Program, delay_gates: Dict[str, float], T1: Dict[int, float], T2: Dict[int, float]) -> Program:
+def _add_delay_maps(prog: Program, delay_gates: Dict[str, float], T1: Dict[int, float], T2: Dict[int, float])\
+		-> Program:
 	"""
     Add kraus maps for a `DELAY` instruction,
     that was converted already into `noisy-I` gate.
