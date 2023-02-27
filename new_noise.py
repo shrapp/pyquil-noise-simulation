@@ -6,7 +6,7 @@
 ##############################################################################
 
 import json
-from typing import Dict, List, Sequence, Optional, Any, Tuple
+from typing import Dict, List, Sequence, Optional, Any, Tuple, Set
 
 import numpy as np
 import requests
@@ -58,11 +58,8 @@ class Calibrations:
 	contains:
 		T1
 		T2
-		fidelity_1q
+		fidelities: 1Q_gate, and a dict for each 2Q gate
 		readout
-		fidelity_CPHASE
-		fidelity_CZ
-		fidelity_XY
 
     args: qc (QuantumComputer, optional): a Quantum Computer (Aspen-M-2 or Aspen-M-3).
     Defaults to None, where the user can define his own calibration data.
@@ -72,22 +69,20 @@ class Calibrations:
     """
 
 	def __init__(self, qc: Optional[QuantumComputer] = None, cal=None):
-		self.fidelity_XY = None
-		self.fidelity_CZ = None
-		self.fidelity_CPHASE = None
-		self.readout_fidelity = None
-		self.fidelity_1q = None
-		self.T2 = None
-		self.T1 = None
+		self.fidelities = {}
+		self.readout_fidelity = {}
+		self.T2 = {}
+		self.T1 = {}
+		self.two_q_gates = set()
 
 		if cal is not None:
 			self.T1 = cal.T1.copy()
 			self.T2 = cal.T2.copy()
-			self.fidelity_1q = cal.fidelity_1q.copy()
 			self.readout_fidelity = cal.readout_fidelity.copy()
-			self.fidelity_CPHASE = cal.fidelity_CPHASE.copy()
-			self.fidelity_CZ = cal.fidelity_CZ.copy()
-			self.fidelity_XY = cal.fidelity_XY.copy()
+			self.fidelities = {}
+			for key, val in cal.fidelity_2q.items():
+				self.fidelities[key] = val.copy()
+			self.two_q_gates = cal.two_q_gates
 			return
 
 		if qc is None:
@@ -102,6 +97,7 @@ class Calibrations:
 			response = requests.get(url + qc_name)
 			file = json.loads(response.text)
 			self.calibrations = file["lattice"]["specs"]
+			self.two_q_gates = self._get_qc_2q_gates(file["lattice"]["isa"]["2Q"])
 			self.create_1q_dicts()
 			self.create_2q_dicts()
 
@@ -114,26 +110,30 @@ class Calibrations:
 		qubits_indexes = [int(q) for q in qs]
 		self.T1 = dict(zip(qubits_indexes, t1))
 		self.T2 = dict(zip(qubits_indexes, t2))
-		self.fidelity_1q = dict(zip(qs, fidelities))
+		self.fidelities['1Q_gate'] = dict(zip(qs, fidelities))
 		self.readout_fidelity = dict(zip(qubits_indexes, readout))
 
 	def create_2q_dicts(self):
 		pairs = self.calibrations['2Q'].keys()
-		cphase = [self.calibrations['2Q'][pair].get("fCPHASE", 1.0) for pair in pairs]
-		self.fidelity_CPHASE = dict(zip(pairs, cphase))
-		cz = [self.calibrations['2Q'][pair].get("fCZ", 1.0) for pair in pairs]
-		self.fidelity_CZ = dict(zip(pairs, cz))
-		xy = [self.calibrations['2Q'][pair].get("fXY", 1.0) for pair in pairs]
-		self.fidelity_XY = dict(zip(pairs, xy))
+		for gate in self.two_q_gates:
+			fidelity = [self.calibrations['2Q'][pair].get("f"+gate, 1.0) for pair in pairs]
+			self.fidelities[gate] = dict(zip(pairs, fidelity))
 
 	def change_noise_intensity(self, intensity: float):
 		self.T1 = change_times_by_ratio(self.T1, intensity)
 		self.T2 = change_times_by_ratio(self.T2, intensity)
-		self.fidelity_1q = change_fidelity_by_noise_intensity(self.fidelity_1q, intensity)
 		self.readout_fidelity = change_fidelity_by_noise_intensity(self.readout_fidelity, intensity)
-		self.fidelity_CPHASE = change_fidelity_by_noise_intensity(self.fidelity_CPHASE, intensity)
-		self.fidelity_CZ = change_fidelity_by_noise_intensity(self.fidelity_CZ, intensity)
-		self.fidelity_XY = change_fidelity_by_noise_intensity(self.fidelity_XY, intensity)
+		for name, dict in self.fidelities.items():
+			self.fidelities[name] = change_fidelity_by_noise_intensity(dict, intensity)
+
+	def _get_qc_2q_gates(self, isa_2q:Dict[str, Dict[str, List]]):
+		gates = set()
+		for pair_val in isa_2q.values():
+			if "type" in pair_val.keys():
+				gates.update(pair_val["type"])
+		return gates
+		
+
 
 
 def damping_after_dephasing(T1: float, T2: float, gate_time: float) -> List[np.ndarray]:
@@ -309,7 +309,9 @@ def depolarizing_kraus(num_qubits: int, p: float = .95) -> List[np.ndarray]:
 	return pauli_kraus_map(probabilities)
 
 
-def _add_depolarizing_noise(prog: Program, fidelities: Dict[str, Dict[str, float]]):
+def _add_depolarizing_noise(
+		prog: Program, 
+		fidelities: Dict[str, Dict[str, float]]):
 	"""
 	add depolarizing noise to the program.
 
@@ -319,8 +321,9 @@ def _add_depolarizing_noise(prog: Program, fidelities: Dict[str, Dict[str, float
 	:return: the changed program
 	"""
 
-	for name in [Depolarizing_1Q_gate, Depolarizing_CPHASE, Depolarizing_CZ, Depolarizing_XY]:
-		gates = [i for i in _get_program_gates(prog) if i.name == name]
+	# for name in [Depolarizing_1Q_gate, Depolarizing_CPHASE, Depolarizing_CZ, Depolarizing_XY]:
+	for name in fidelities.keys():
+		gates = [i for i in _get_program_gates(prog) if i.name == "Depolarizing_" + name]
 		kraus_maps = _create_depolarizing_kraus_maps(gates, fidelities[name])
 		for k in kraus_maps:
 			prog.define_noisy_gate(k["gate"], k["targets"], k["kraus_ops"])
@@ -362,6 +365,7 @@ def _def_gate_to_prog(name: str, dim: int, new_p: Program):
 def _define_noisy_gates_on_new_program(
 		new_p: Program,
 		prog: Program,
+		two_q_gates: Set,
 		depolarizing: bool,
 		decoherence_after_1q_gate: bool,
 		decoherence_after_2q_gate: bool
@@ -374,6 +378,7 @@ def _define_noisy_gates_on_new_program(
 
 	:param new_p: new program, to add definitions on.
 	:param prog: old program, to find which noise gates we need.
+	:param two_q_gates: Set of 2-Q gates that exsist in the QC calibrations.
 	:param depolarizing: add depolarizing noise, default is True.
 	:param decoherence_after_1q_gate: add decoherence noise to all qubits after every one-qubit gate.
 	:param decoherence_after_2q_gate: add decoherence noise to all qubits after every two-qubit gate.
@@ -382,7 +387,8 @@ def _define_noisy_gates_on_new_program(
 	"""
 
 	# check which noise types are needed the program:
-	depolarizing_1q = depolarizing_cphase = depolarizing_cz = depolarizing_xy = no_depolarizing = dec_1q = dec_2q = False
+	depolarizing_1q = no_depolarizing = dec_1q = dec_2q = False
+	depolarizing_2q = {gate: False for gate in two_q_gates}
 	noise_gates = {}
 	for i in prog:
 		if (decoherence_after_1q_gate or decoherence_after_2q_gate) and \
@@ -401,24 +407,17 @@ def _define_noisy_gates_on_new_program(
 				if decoherence_after_2q_gate:
 					dec_2q = True
 				if depolarizing:
-					if i.name == "CPHASE":
-						depolarizing_cphase = True
-					elif i.name == "CZ":
-						depolarizing_cz = True
-					elif i.name == "XY":
-						depolarizing_xy = True
+					if i.name in two_q_gates:
+						depolarizing_2q[i.name] = True
 					else:
 						no_depolarizing = True
 
 	# add relevant definitions and noise gates:
 	if depolarizing_1q:
 		noise_gates[Depolarizing_1Q_gate] = _def_gate_to_prog(Depolarizing_1Q_gate, 2, new_p)
-	if depolarizing_cphase:
-		noise_gates[Depolarizing_CPHASE] = _def_gate_to_prog(Depolarizing_CPHASE, 4, new_p)
-	if depolarizing_cz:
-		noise_gates[Depolarizing_CZ] = _def_gate_to_prog(Depolarizing_CZ, 4, new_p)
-	if depolarizing_xy:
-		noise_gates[Depolarizing_XY] = _def_gate_to_prog(Depolarizing_XY, 4, new_p)
+	for gate, val in depolarizing_2q.items():
+		if val:
+			noise_gates[gate] = _def_gate_to_prog("Depolarizing_"+gate, 4, new_p)
 	if dec_2q:
 		noise_gates[decoherence_2Q_name] = _def_gate_to_prog(decoherence_2Q_name, 2, new_p)
 	if dec_1q:
@@ -451,8 +450,7 @@ def _add_noisy_gates_to_program(new_p: Program, prog: Program, noise_gates: Dict
 
 				if len(targets) == 2:
 					if depolarizing:
-						# TODO: import gates options from calibrations
-						name = ("Depolarizing_" + i.name) if i.name in ['CPHASE', "XY", "CZ"] else No_Depolarizing
+						name = i.name if i.name in noise_gates.keys() else No_Depolarizing
 						new_p += noise_gates[name](targets[0], targets[1])
 					if decoherence_after_2q_gate:
 						for q in qubits:
@@ -473,11 +471,7 @@ def _add_noisy_gates_to_program(new_p: Program, prog: Program, noise_gates: Dict
 def _add_kraus_maps_to_program(new_p: Program, calibrations: Calibrations, delay_gates: Dict, depolarizing: bool,
                                decoherence_after_1q_gate: bool, decoherence_after_2q_gate: bool, readout_noise: bool):
 	if depolarizing:
-		new_p = _add_depolarizing_noise(prog=new_p, fidelities={
-			Depolarizing_1Q_gate: calibrations.fidelity_1q,
-			Depolarizing_CPHASE: calibrations.fidelity_CPHASE,
-			Depolarizing_CZ: calibrations.fidelity_CZ,
-			Depolarizing_XY: calibrations.fidelity_XY})
+		new_p = _add_depolarizing_noise(prog=new_p, fidelities=calibrations.fidelities)
 
 	if decoherence_after_1q_gate or decoherence_after_2q_gate:
 		new_p = add_decoherence_noise(prog=new_p, T1=calibrations.T1, T2=calibrations.T2)
@@ -525,9 +519,12 @@ def add_noise_to_program(
 	if convert_to_native:
 		p = qc.compiler.quil_to_native_quil(p)
 
+	if calibrations is None:
+		calibrations = Calibrations(qc=qc)
+	
 	new_p = Program()
 
-	new_p, noise_gates = _define_noisy_gates_on_new_program(new_p=new_p, prog=p,
+	new_p, noise_gates = _define_noisy_gates_on_new_program(new_p=new_p, prog=p, two_q_gates=calibrations.two_q_gates,
 	                                                        depolarizing=depolarizing,
 	                                                        decoherence_after_2q_gate=decoherence_after_2q_gate,
 	                                                        decoherence_after_1q_gate=decoherence_after_1q_gate)
@@ -538,8 +535,6 @@ def add_noise_to_program(
 	                                                 depolarizing=depolarizing,
 	                                                 decoherence_only_on_targets=decoherence_only_on_targets)
 
-	if calibrations is None:
-		calibrations = Calibrations(qc=qc)
 	if noise_intensity != 1.0:
 		new_calibrations = Calibrations(cal=calibrations)
 		new_calibrations.change_noise_intensity(noise_intensity)
