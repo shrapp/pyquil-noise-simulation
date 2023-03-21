@@ -87,7 +87,7 @@ class Calibrations:
 			self.T2 = cal.T2.copy()
 			self.readout_fidelity = cal.readout_fidelity.copy()
 			self.fidelities = {}
-			for key, val in cal.fidelity_2q.items():
+			for key, val in cal.fidelities.items():
 				self.fidelities[key] = val.copy()
 			self.two_q_gates = cal.two_q_gates
 			return

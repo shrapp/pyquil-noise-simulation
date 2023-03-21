@@ -12,3 +12,4 @@ add tutorial for every function
 
 presentation
 
+can not use barriers
