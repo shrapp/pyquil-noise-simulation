@@ -10,16 +10,8 @@ Documantations: explanation about depolarizing and about ghz
 
 Investigate Decoherence implementation
 
-Option to AD or dephazing??
+-Option to AD or dephazing??
 
-Add tabs before noisy gates names
+-Add tabs before noisy gates names
 
-Add simple but pritty amplitude damping example
-
-add docs to all functions
-
-add tutorial for every function
-
-presentation
-
-can not use barriers
+Add simple but pretty amplitude damping example

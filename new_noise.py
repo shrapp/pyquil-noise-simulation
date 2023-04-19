@@ -47,23 +47,7 @@ def change_times_by_ratio(times: Dict[Any, float], ratio: float):
 	return times
 
 
-def change_fidelity_by_noise_intensity(fidelity: Dict[Any, float], intensity: float):
-	"""
-	change the fidelities in the dict `fidelity` 
-	so that the noise (1-fidelity) will change by a given `intensity`. 
-	the fidelity will always stay in range [0.0, 1.0].
-	"""
-	for key in fidelity.keys():
-		fidelity[key] = max(0.0, min(1.0, 1 - ((1 - fidelity[key]) * intensity)))
-	return fidelity
 
-
-def get_qc_2q_gates(isa_2q:Dict[str, Dict[str, List]]) -> Set[str]:
-	gates = set()
-	for pair_val in isa_2q.values():
-		if "type" in pair_val.keys():
-			gates.update(pair_val["type"])
-	return gates
 
 
 class Calibrations:
@@ -112,9 +96,9 @@ class Calibrations:
 			response = requests.get(url + qc_name)
 			file = json.loads(response.text)
 			self.calibrations = file["lattice"]["specs"]
-			self.two_q_gates = get_qc_2q_gates(file["lattice"]["isa"]["2Q"])
-			self.create_1q_dicts()
-			self.create_2q_dicts()
+			self.two_q_gates = self._get_qc_2q_gates(file["lattice"]["isa"]["2Q"])
+			self._create_1q_dicts()
+			self._create_2q_dicts()
 
 	def _create_1q_dicts(self):
 		qs = self.calibrations['1Q'].keys()
@@ -134,12 +118,29 @@ class Calibrations:
 			fidelity = [self.calibrations['2Q'][pair].get("f"+gate, 1.0) for pair in pairs]
 			self.fidelities[gate] = dict(zip(pairs, fidelity))
 
-	def _change_noise_intensity(self, intensity: float):
+	def change_noise_intensity(self, intensity: float):
 		self.T1 = change_times_by_ratio(self.T1, intensity)
 		self.T2 = change_times_by_ratio(self.T2, intensity)
-		self.readout_fidelity = change_fidelity_by_noise_intensity(self.readout_fidelity, intensity)
+		self.readout_fidelity = self.change_fidelity_by_noise_intensity(self.readout_fidelity, intensity)
 		for name, dict in self.fidelities.items():
-			self.fidelities[name] = change_fidelity_by_noise_intensity(dict, intensity)
+			self.fidelities[name] = self.change_fidelity_by_noise_intensity(dict, intensity)
+
+	def _get_qc_2q_gates(self, isa_2q: Dict[str, Dict[str, List]]) -> Set[str]:
+		gates = set()
+		for pair_val in isa_2q.values():
+			if "type" in pair_val.keys():
+				gates.update(pair_val["type"])
+		return gates
+
+	def change_fidelity_by_noise_intensity(self,fidelity: Dict[Any, float], intensity: float):
+		"""
+		change the fidelities in the dict `fidelity`
+		so that the noise (1-fidelity) will change by a given `intensity`.
+		the fidelity will always stay in range [0.0, 1.0].
+		"""
+		for key in fidelity.keys():
+			fidelity[key] = max(0.0, min(1.0, 1 - ((1 - fidelity[key]) * intensity)))
+		return fidelity
 
 
 def damping_after_dephasing(T1: float, T2: float, gate_time: float) -> List[np.ndarray]:
