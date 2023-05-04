@@ -505,9 +505,9 @@ def add_noise_to_program(
 		convert_to_native: bool = True,
 		calibrations: Optional[Calibrations] = None,
 		depolarizing: bool = True,
-		decoherence_after_1q_gate: bool = False,
-		decoherence_after_2q_gate: bool = True,
-		decoherence_only_on_targets: bool = False,
+		single_q_noise_after_1q_gate: bool = False,
+		single_q_noise_after_2q_gate: bool = True,
+		single_q_noise_only_on_targets: bool = False,
 		readout_noise: bool = True,
 		noise_intensity: float = 1.0
 ) -> Program:
@@ -545,22 +545,22 @@ def add_noise_to_program(
 
 	new_p, noise_gates = define_noisy_gates_on_new_program(new_p=new_p, prog=p, two_q_gates=calibrations.two_q_gates,
 	                                                       depolarizing=depolarizing,
-	                                                       decoherence_after_2q_gate=decoherence_after_2q_gate,
-	                                                       decoherence_after_1q_gate=decoherence_after_1q_gate)
+	                                                       decoherence_after_2q_gate=single_q_noise_after_2q_gate,
+	                                                       decoherence_after_1q_gate=single_q_noise_after_1q_gate)
 
 	new_p, delay_gates = add_noisy_gates_to_program(new_p=new_p, prog=p, noise_gates=noise_gates,
-	                                                decoherence_after_2q_gate=decoherence_after_2q_gate,
-	                                                decoherence_after_1q_gate=decoherence_after_1q_gate,
+	                                                decoherence_after_2q_gate=single_q_noise_after_2q_gate,
+	                                                decoherence_after_1q_gate=single_q_noise_after_1q_gate,
 	                                                depolarizing=depolarizing,
-	                                                decoherence_only_on_targets=decoherence_only_on_targets)
+	                                                decoherence_only_on_targets=single_q_noise_only_on_targets)
 
 	if noise_intensity != 1.0:
 		new_calibrations = Calibrations(cal=calibrations)
 		new_calibrations.change_noise_intensity(noise_intensity)
 		calibrations = new_calibrations
 
-	new_p = add_kraus_maps_to_program(new_p, calibrations, delay_gates, depolarizing, decoherence_after_1q_gate,
-	                                  decoherence_after_2q_gate, readout_noise)
+	new_p = add_kraus_maps_to_program(new_p, calibrations, delay_gates, depolarizing, single_q_noise_after_1q_gate,
+	                                  single_q_noise_after_2q_gate, readout_noise)
 
 	new_p.wrap_in_numshots_loop(p.num_shots)
 
