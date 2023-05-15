@@ -14,6 +14,11 @@ This proposal aims to enhance the PyQuil simulator by introducing a more realist
 
 These enhancements will enable researchers and developers to simulate quantum algorithms with realistic noise, allowing them to design error-correcting techniques tailored to Rigetti's platform.
 
+Content
+-------
+- new_noise.py : The implementation of the new fetures.
+- Documentation.ipynb : A short tutorial of the new fetures.
+
 Integration
 ------------
 
