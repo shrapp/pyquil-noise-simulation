@@ -1,3 +1,5 @@
+# Background
+
 Title: Realistic Noise Simulation of Rigetti's QPU in PyQuil
 
 Description: This proposal aims to introduce a new feature to PyQuil, specifically a realistic noise simulation of Rigetti's QPU. This feature will enhance the current PyQuil simulator's capabilities by providing a more accurate representation of quantum computation in the presence of noise.
@@ -24,3 +26,8 @@ Support for non-native gates: Extend the noise simulation framework to support n
 We have considered alternative solutions, such as using existing noise simulation libraries like Qiskit's noise module, but believe that a tailored solution for Rigetti's QPU within PyQuil would provide the most accurate and seamless experience for users working with this specific platform.
 
 By implementing these features, we aim to provide a more accurate and useful tool for researchers and developers working with Rigetti's QPU, allowing them to simulate quantum algorithms with realistic noise and develop error-correcting techniques tailored to this platform. This will ultimately help improve the overall performance and reliability of quantum computing applications on Rigetti's hardware.
+
+# Integration
+
+the code in new_noise.py sould be copied into noise.py so that those fetures could be used throug it.
+it does not replace it as a new module.
