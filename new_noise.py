@@ -34,6 +34,9 @@ from typing import (
     Self,
 )
 
+# delete this FIXME	
+from pyquil.quil import Program
+
 import numpy as np
 import requests
 
